@@ -288,7 +288,7 @@ Fields:
 - Instance type (0=none, 1=party dungeon, 2=raid, 3=pvp, 4=arena)
 - Loading screen ID reference
 - Expansion ID (0=vanilla, 1=TBC, 2=WotLK)
-- Various flags (PvP, development, etc.)
+- Flags (uint32 bitmask) - **Note:** Map flags are not well documented for WotLK. Only `MAP_FLAG_DYNAMIC_DIFFICULTY` (0x100) is known to be used in TrinityCore. Other flag values are undocumented and may be unused, reserved, or from later expansions. Most maps use `0` (no flags) or copy flags from an existing map (e.g., `std.Maps.load(0).Flags.get()`).
 
 **AreaTable.dbc**
 ```typescript
@@ -402,7 +402,7 @@ std.Maps
   .Tiles.add(mod, [[coords]])       // Generates ADT template files
   .Type.DUNGEON.set()              // Changes to dungeon (adds SQL)
   .Type.PLAIN.set()                // Plain overworld map (default)
-  .Flags.set(value)                // Various behavior flags
+  .Flags.set(value)                // Map flags (uint32) - see note below
   .MaxPlayers.set(count)           // Player limit (instances)
 ```
 
