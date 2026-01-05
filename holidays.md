@@ -105,6 +105,38 @@ The main game event table that links holidays to server-side events. See [`sql/g
 - The server's `GameEventMgr::SetHolidayEventTime()` function handles this calculation
 - Holiday events with ID >= 500 are ignored by the server (custom holiday IDs)
 
+### game_event_* Tables
+
+Holiday game events can be linked to various game systems through additional `game_event_*` tables. These tables control what happens in the game world when a holiday event is active:
+
+- **`game_event_creature`**: NPCs that spawn during the holiday event
+- **`game_event_creature_quest`**: Quests offered by NPCs during the holiday
+- **`game_event_gameobject`**: GameObjects that spawn or despawn during the holiday (negative `eventEntry` removes objects)
+- **`game_event_gameobject_quest`**: Quests available from GameObjects during the holiday
+- **`game_event_npc_vendor`**: Vendor items available from NPCs during the holiday (negative `eventEntry` removes items)
+- **`game_event_npcflag`**: NPC flag changes during the holiday (e.g., making vendors available)
+- **`game_event_model_equip`**: NPC model/equipment changes during the holiday (negative `eventEntry` removes changes)
+- **`game_event_pool`**: Pool templates (spawn groups) linked to the holiday
+- **`game_event_battleground_holiday`**: Battleground holidays (links events to specific battlegrounds)
+- **`game_event_condition`**: Conditions that must be met for the event to activate
+- **`game_event_quest_condition`**: Quest conditions tied to the holiday event
+- **`game_event_seasonal_questrelation`**: Seasonal quest relations for the holiday
+- **`game_event_prerequisite`**: Event prerequisites (events that must be active first)
+- **`game_event_arena_seasons`**: Arena seasons tied to the holiday event
+
+**Key Points**:
+- All these tables reference `game_event.eventEntry` (not the holiday ID directly)
+- When a holiday event is active, the server checks these tables to determine what NPCs spawn, what quests are available, etc.
+- Negative `eventEntry` values in some tables (like `game_event_gameobject`, `game_event_npc_vendor`) remove things during the event rather than adding them
+- These tables allow holidays to have complex server-side behaviors beyond just calendar display
+
+**Example**: A Winter Veil holiday might:
+- Spawn special NPCs (`game_event_creature`)
+- Add holiday vendor items (`game_event_npc_vendor`)
+- Offer holiday quests (`game_event_creature_quest`)
+- Change NPC appearances (`game_event_model_equip`)
+- Spawn holiday decorations (`game_event_gameobject`)
+
 ## Holiday Types and Stages
 
 Holidays support three main types, each with different scheduling behaviors:
@@ -221,6 +253,14 @@ The calendar supports filtering holidays by type (weekly vs yearly) and displays
 │  (SQL Table)    │
 └─────────────────┘
         │
+        │ Referenced by
+        ▼
+┌─────────────────────────────────────────┐
+│  game_event_* Tables                     │
+│  (Creatures, GameObjects, Quests,       │
+│   Vendors, NPC Flags, Conditions, etc.) │
+└─────────────────────────────────────────┘
+        │
         │ Controls
         ▼
 ┌─────────────────┐
@@ -236,13 +276,19 @@ The calendar supports filtering holidays by type (weekly vs yearly) and displays
 2. **Server**: 
    - Loads `Holidays.dbc` into memory
    - Loads `holiday_dates` table and overrides DBC values
-   - Loads `game_event` table
+   - Loads `game_event` table and all `game_event_*` tables
    - For each game event with `holiday != 0`:
      - Looks up the holiday in DBC
      - Calculates start time from holiday Date[holidayStage]
      - Sets duration from holiday Duration[holidayStage]
      - Sets occurrence based on CalendarFilterType
    - Activates events based on calculated times
+   - When a holiday event becomes active, the server checks all `game_event_*` tables to:
+     - Spawn/despawn NPCs and GameObjects
+     - Enable/disable quests
+     - Add/remove vendor items
+     - Modify NPC flags and appearances
+     - Apply conditions and prerequisites
 
 ### TSWoW API Usage
 
