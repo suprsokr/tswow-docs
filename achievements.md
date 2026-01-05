@@ -64,8 +64,8 @@ The world database contains server-side configuration that supplements the DBC d
 The DBC structure definitions are in TrinityCore's [`DBCStructure.h`](https://github.com/tswow/TrinityCore/tree/c797f13b2c9f5a1a2fadef03eab660ffb675800d/src/server/shared/DataStores/DBCStructure.h).
 
 ### achievement_dbc
-This table is used to override or extend DBC achievement data on the server.
-It contains a subset of Achievement.dbc fields. See [achievement_dbc.ts](https://github.com/tswow/tswow/tree/master/tswow-scripts/wotlk/sql/achievement_dbc.ts) for the TSWoW wrapper:
+This table provides **partial server-side overrides** for specific Achievement.dbc fields.
+It contains only a subset of Achievement.dbc fields. See [achievement_dbc.ts](https://github.com/tswow/tswow/tree/master/tswow-scripts/wotlk/sql/achievement_dbc.ts) for the TSWoW wrapper:
 - **ID**: Achievement ID (primary key, references Achievement.dbc)
 - **requiredFaction**: Faction requirement override
 - **mapID**: Map requirement override
@@ -74,8 +74,22 @@ It contains a subset of Achievement.dbc fields. See [achievement_dbc.ts](https:/
 - **count**: Minimum criteria count override
 - **refAchievement**: Reference achievement override
 
-**Note**: This table is typically used for server-specific modifications or
-achievements that need to be hidden from the client but tracked server-side.
+#### How It Works
+
+The `achievement_dbc` table is loaded **after** the client `Achievement.dbc` file during server startup (see [`DBCStores.cpp`](https://github.com/tswow/TrinityCore/tree/c797f13b2c9f5a1a2fadef03eab660ffb675800d/src/server/game/DataStores/DBCStores.cpp)). The loading process uses a format string (`CustomAchievementfmt`) that maps SQL columns to specific DBC fields, allowing only the listed fields above to be overridden.
+
+**Important Limitations:**
+1. **Cannot override existing entries**: The loader will abort if attempting to override an achievement that already exists in the client DBC (see [`DBCDatabaseLoader.cpp`](https://github.com/tswow/TrinityCore/tree/c797f13b2c9f5a1a2fadef03eab660ffb675800d/src/server/shared/DataStores/DBCDatabaseLoader.cpp)). This means `achievement_dbc` is primarily designed to **add new achievements** that don't exist in the client DBC, not to modify existing ones.
+2. **Partial override only**: Only the 7 fields listed above can be overridden. All other fields (title, description, icon, category, etc.) remain from the client DBC file.
+3. **Client display unchanged**: Since the client uses its own DBC file, any changes in `achievement_dbc` only affect server-side logic (faction checks, map restrictions, flags, points). The client will still display the original achievement name, description, and icon from its DBC file.
+
+#### Use Cases
+
+- **Adding new server-only achievements**: Create achievements that exist only on the server and aren't in the client DBC
+- **Server-side corrections**: Fix incorrect server-side logic (faction requirements, map restrictions) for achievements where the client DBC has wrong values
+- **Hidden achievements**: Use flags to create achievements that are tracked server-side but hidden from the client UI
+
+**Note**: For modifying existing achievements, you typically need to modify the client DBC file directly or use TSWoW's DBC editing capabilities, as `achievement_dbc` cannot override entries that already exist in the loaded DBC.
 
 ### achievement_reward
 Defines rewards given when an achievement is completed. See [achievement_reward.ts](https://github.com/tswow/tswow/tree/master/tswow-scripts/wotlk/sql/achievement_reward.ts) and [AchievementReward.ts](https://github.com/tswow/tswow/tree/master/tswow-scripts/wotlk/std/Achievement/AchievementReward.ts) for TSWoW wrappers:
@@ -154,8 +168,10 @@ The core achievement management logic is implemented in TrinityCore's [`Achievem
    criteria in Achievement_Criteria.dbc. Categories organize them in the UI.
    TSWoW provides wrappers in [`Achievement.ts`](https://github.com/tswow/tswow/tree/master/tswow-scripts/wotlk/std/Achievement/Achievement.ts) and [`AchievementCriteria.ts`](https://github.com/tswow/tswow/tree/master/tswow-scripts/wotlk/std/Achievement/AchievementCriteria.ts).
 
-2. **Server Configuration**: Server-side tables (achievement_reward,
-   achievement_criteria_data) add rewards and additional conditions.
+2. **Server Configuration**: Server-side tables add configuration:
+   - `achievement_dbc`: Adds new achievements or overrides specific server-side fields (faction, map, points, flags) for achievements not in client DBC
+   - `achievement_reward`: Defines rewards (titles, items) granted on completion
+   - `achievement_criteria_data`: Adds additional server-side conditions for criteria
 
 3. **Progress Tracking**: As players perform actions, the server calls
    [`UpdateAchievementCriteria()`](https://github.com/tswow/TrinityCore/tree/c797f13b2c9f5a1a2fadef03eab660ffb675800d/src/server/game/Achievements/AchievementMgr.cpp) which:
@@ -254,7 +270,7 @@ When achievements are updated:
 - Display information
 
 ### Server-Side (World Database)
-- Achievement overrides (achievement_dbc)
+- New achievements and partial field overrides (achievement_dbc) - adds new achievements or overrides specific server-side fields for achievements not in client DBC
 - Rewards (achievement_reward, achievement_reward_locale)
 - Additional criteria conditions (achievement_criteria_data)
 
