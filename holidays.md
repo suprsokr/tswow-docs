@@ -272,23 +272,31 @@ The calendar supports filtering holidays by type (weekly vs yearly) and displays
 
 ### Loading Process
 
-1. **Client**: Loads `Holidays.dbc`, `HolidayNames.dbc`, `HolidayDescriptions.dbc` at startup
+The server and client load DBC files independently. The server controls what actually happens in-game (NPCs, quests, vendors, etc.), while the client only uses DBCs to display holidays in the calendar UI.
+
+1. **Client**: 
+   - Loads `Holidays.dbc`, `HolidayNames.dbc`, `HolidayDescriptions.dbc` at startup
+   - Uses these DBCs **only** to display holidays in the calendar UI
+
 2. **Server**: 
-   - Loads `Holidays.dbc` into memory
+   - Loads `Holidays.dbc` into memory (`sHolidaysStore`)
    - Loads `holiday_dates` table and overrides DBC values
    - Loads `game_event` table and all `game_event_*` tables
    - For each game event with `holiday != 0`:
-     - Looks up the holiday in DBC
-     - Calculates start time from holiday Date[holidayStage]
-     - Sets duration from holiday Duration[holidayStage]
-     - Sets occurrence based on CalendarFilterType
-   - Activates events based on calculated times
-   - When a holiday event becomes active, the server checks all `game_event_*` tables to:
+     - Looks up the holiday in the in-memory DBC
+     - Calls `SetHolidayEventTime()` to calculate times from holiday data
+     - If `holiday->Date[0]` or `holiday->Duration[0]` is zero, `SetHolidayEventTime()` returns early without modifying event times
+     - Otherwise calculates start time from holiday `Date[holidayStage]`, duration from `Duration[holidayStage]`, and occurrence based on `CalendarFilterType`
+     - If holiday calculation fails, event retains its SQL `start_time`/`end_time` values (if set)
+   - Periodically checks (`GameEventMgr::Update()`) if events should be active based on calculated times
+   - When a holiday event becomes active (`ApplyNewEvent()`), the server checks all `game_event_*` tables to:
      - Spawn/despawn NPCs and GameObjects
      - Enable/disable quests
      - Add/remove vendor items
      - Modify NPC flags and appearances
      - Apply conditions and prerequisites
+
+The server determines if a holiday is active by checking if its associated game events are active (via `IsHolidayActive()`). Even if the client's DBC files show a holiday in the calendar, the server controls whether NPCs spawn, quests are available, etc. If the server's DBC Date/Duration arrays are populated, the server will calculate event times and activate the events, causing in-game effects regardless of what the client displays.
 
 ### TSWoW API Usage
 
