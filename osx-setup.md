@@ -137,6 +137,8 @@ Leave the mysql server running. When doing a full build of tswow, it will downlo
 
 ## Setup direnv
 
+### Step 1: Configure direnv in Your Shell
+
 Add to your `~/.zshrc` (or `~/.bashrc` if using bash):
 
 ```bash
@@ -149,11 +151,94 @@ Reload your shell:
 source ~/.zshrc  # or source ~/.bashrc
 ```
 
-Allow the environment configuration:
+### Step 2: Create .envrc File
+
+Create a `.envrc` file in the root of your TSWoW project directory (the same directory where you cloned the repository). This file will configure the development environment automatically when you enter the directory.
+
+Create the file:
+
+```bash
+cd /path/to/tswow-root  # Navigate to your TSWoW root directory
+touch .envrc
+```
+
+Then add the following contents to `.envrc`:
+
+```bash
+# TSWoW macOS Development Environment
+
+# Homebrew
+HOMEBREW_PREFIX="${HOMEBREW_PREFIX:-/opt/homebrew}"
+[ ! -d "$HOMEBREW_PREFIX" ] && HOMEBREW_PREFIX="/usr/local"
+export PATH="$HOMEBREW_PREFIX/bin:$HOMEBREW_PREFIX/sbin:$PATH"
+
+# Node.js 20.18.0 via nvm
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && source "$NVM_DIR/nvm.sh"
+nvm use 20.18.0 2>/dev/null
+
+# CMake 3.25.0
+export PATH="/opt/cmake-3.25.0/CMake.app/Contents/bin:$PATH"
+
+# Compilers
+export CC="clang"
+export CXX="clang++"
+
+# Compiler flags for MSVC compatibility
+# Disable PNG NEON optimizations to avoid linker errors on macOS ARM
+# Use C++17 for Node.js v20 native modules (deasync) and general compatibility
+export CXXFLAGS="-DSOL_NO_NIL=0 -w -fms-extensions -std=c++17 -DPNG_ARM_NEON_OPT=0"
+export CPPFLAGS="-DSOL_NO_NIL=0 -DPNG_ARM_NEON_OPT=0"
+export CMAKE_CXX_FLAGS="-DSOL_NO_NIL=0 -w -fms-extensions -std=c++17 -DPNG_ARM_NEON_OPT=0"
+
+# C flags - use C99 standard (needed for BLPConverter) but allow implicit function declarations
+# This is needed because LibTomMalloc/LibTomFree are used before being declared in StormLib
+# Disable PNG NEON optimizations to avoid linker errors on macOS ARM
+export CFLAGS="-std=c99 -Wno-error=implicit-function-declaration -Wno-implicit-function-declaration -Wno-error=int-conversion -Wno-int-conversion -DPNG_ARM_NEON_OPT=0"
+export CMAKE_C_FLAGS="-std=c99 -Wno-error=implicit-function-declaration -Wno-implicit-function-declaration -Wno-error=int-conversion -Wno-int-conversion -DPNG_ARM_NEON_OPT=0"
+
+# MySQL 8.4
+export MYSQL_DIR="$HOMEBREW_PREFIX/opt/mysql@8.4"
+export MYSQL_ROOT_DIR="$MYSQL_DIR"
+export PATH="$MYSQL_DIR/bin:$PATH"
+export MYSQL_INCLUDE_DIR="$MYSQL_DIR/include/mysql"
+export MYSQL_LIBRARY="$MYSQL_DIR/lib/libmysqlclient.dylib"
+
+# OpenSSL
+export OPENSSL_DIR="$HOMEBREW_PREFIX/opt/openssl@3"
+export PATH="$OPENSSL_DIR/bin:$PATH"
+export OPENSSL_ROOT_DIR="$OPENSSL_DIR"
+export OPENSSL_INCLUDE_DIR="$OPENSSL_DIR/include"
+export PKG_CONFIG_PATH="$OPENSSL_DIR/lib/pkgconfig:$PKG_CONFIG_PATH"
+
+# Boost 1.82.0
+export BOOST_ROOT="/opt/boost_1_82_0"
+export BOOST_INCLUDE_DIR="$BOOST_ROOT/include"
+export BOOST_LIBRARY_DIR="$BOOST_ROOT/lib"
+export CMAKE_PREFIX_PATH="$BOOST_ROOT:$MYSQL_DIR:${CMAKE_PREFIX_PATH:-}"
+export Boost_NO_BOOST_CMAKE=ON
+
+# Library paths
+export LDFLAGS="-L$HOMEBREW_PREFIX/lib -L$MYSQL_DIR/lib"
+export CPPFLAGS="$CPPFLAGS -I$HOMEBREW_PREFIX/include"
+export DYLD_LIBRARY_PATH="$HOMEBREW_PREFIX/lib:$MYSQL_DIR/lib:${DYLD_LIBRARY_PATH:-}"
+export LIBRARY_PATH="$HOMEBREW_PREFIX/lib:$MYSQL_DIR/lib:${LIBRARY_PATH:-}"
+export PKG_CONFIG_PATH="$HOMEBREW_PREFIX/lib/pkgconfig:$PKG_CONFIG_PATH"
+```
+
+### Step 3: Allow direnv to Load the Configuration
+
+After creating the `.envrc` file, you need to allow direnv to load it. This is a security feature that prevents direnv from automatically executing untrusted scripts.
+
+Run the following command in your TSWoW root directory:
 
 ```bash
 direnv allow
 ```
+
+**Note:** You only need to run `direnv allow` once per `.envrc` file. If you modify the `.envrc` file later, direnv will prompt you to run `direnv allow` again to approve the changes.
+
+After running `direnv allow`, direnv will automatically load the environment variables whenever you enter the directory, and unload them when you leave. You should see a message indicating that direnv is loading the `.envrc` file.
 
 ## Building TSWoW
 
